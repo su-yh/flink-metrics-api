@@ -1,0 +1,15 @@
+
+spring:
+  config:
+    import:
+      - application-custom.yaml
+      - application-datasource.yaml
+      - application-flyway.yaml
+      - application-knife4j.yaml
+      - application-log.yaml
+      - application-redis.yaml
+      - application-spring.yaml
+      - application-web.yaml
+
+
+

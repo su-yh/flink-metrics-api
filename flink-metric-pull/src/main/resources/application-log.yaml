@@ -1,0 +1,21 @@
+logging:
+  level:
+    root: info
+    # com.baomidou.mybatisplus.extension.toolkit.Db: error
+  file:
+    name: tmp/mock/logs/mock.log
+  logback:
+    rollingpolicy:
+      file-name-pattern: /tmp/mock/logs/%d{yyyy-MM-dd}/mock.%03i.log
+
+---
+spring:
+  config:
+    activate:
+      on-profile: suyh
+
+logging:
+  level:
+    root: info
+
+

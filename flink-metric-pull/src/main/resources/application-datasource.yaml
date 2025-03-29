@@ -1,0 +1,41 @@
+spring:
+  datasource:
+    dynamic:
+      enabled: true
+      strict: true
+      primary: "default"
+
+
+biz:
+  datasource:
+    hikari:
+      multi:
+        default:
+          flyway:
+            enabled: false
+            locations:
+              - "sqls/mysql"
+              - "sqls/pgsql"
+
+
+
+
+---
+spring:
+  config:
+    activate:
+      on-profile: suyh
+
+biz:
+  datasource:
+    hikari:
+      multi:
+        default:
+          jdbc-url: jdbc:mysql://isuyh.com:3306/suyh_flink_metric?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&rewriteBatchedStatements=true
+          username: suyh_flink_metric
+          password: suyh_flink_metric
+          flyway:
+            enabled: true
+
+
+
