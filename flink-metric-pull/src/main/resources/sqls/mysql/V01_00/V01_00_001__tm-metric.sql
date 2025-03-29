@@ -32,4 +32,4 @@ CREATE TABLE tm_metric
 ) ENGINE = innodb COMMENT "taskManager 指标记录表";
 
 ALTER TABLE tm_metric
-    ADD INDEX idx_tm_metric_t_t(task_manager_id, ts);
+    ADD UNIQUE INDEX idx_tm_metric_t_t(task_manager_id, ts);

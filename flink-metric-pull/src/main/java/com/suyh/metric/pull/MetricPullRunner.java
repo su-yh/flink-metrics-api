@@ -1,5 +1,6 @@
 package com.suyh.metric.pull;
 
+import com.suyh.metric.constant.Constants;
 import com.suyh.metric.dto.rsp.TaskManagerDetailsRspDto;
 import com.suyh.metric.dto.rsp.TaskManagerInfoDetail;
 import com.suyh.metric.dto.rsp.TaskManagersInfoRspDto;
@@ -63,7 +64,46 @@ public class MetricPullRunner implements ApplicationRunner {
         }
 
         for (TaskManagerInfoDetail manager : managers) {
-            executorService.submit(() -> queryTaskManagerMetric(manager));
+            executorService.submit(() -> queryTaskManagerMetricPlus(manager));
+        }
+    }
+
+//    private final List<String> metricsParamsList = Arrays.asList("Status.JVM.Memory.Heap.Used",
+//            "Status.JVM.Memory.Heap.Max",
+//            "Status.Shuffle.Netty.UsedMemory",
+//            "Status.Shuffle.Netty.TotalMemory",
+//            "Status.Flink.Memory.Managed.Used",
+//            "Status.Flink.Memory.Managed.Total",
+//            "Status.JVM.Memory.Metaspace.Used",
+//            "Status.JVM.Memory.Metaspace.Max");
+//
+//    private static final String metricsParams = "Status.JVM.Memory.Heap.Used," +
+//            "Status.JVM.Memory.Heap.Max," +
+//            "Status.Shuffle.Netty.UsedMemory," +
+//            "Status.Shuffle.Netty.TotalMemory," +
+//            "Status.Flink.Memory.Managed.Used," +
+//            "Status.Flink.Memory.Managed.Total," +
+//            "Status.JVM.Memory.Metaspace.Used," +
+//            "Status.JVM.Memory.Metaspace.Max";
+
+    private void queryTaskManagerMetricPlus(TaskManagerInfoDetail manager) {
+        // 这里get 后面的值应该是可以通过api: http://192.168.8.143:8991/taskmanagers/localhost:34339-19078e/metrics 得到。
+        // http://192.168.8.143:8991/taskmanagers/localhost:34339-19078e/metrics?get=Status.JVM.Memory.Heap.Used,Status.JVM.Memory.Heap.Max,Status.Shuffle.Netty.UsedMemory,Status.Shuffle.Netty.TotalMemory,Status.Flink.Memory.Managed.Used,Status.Flink.Memory.Managed.Total,Status.JVM.Memory.Metaspace.Used,Status.JVM.Memory.Metaspace.Max
+        try {
+            String metricsParams = String.join(",", Constants.STATUS_ID_LIST);
+            String url = "http://192.168.8.143:8991/taskmanagers/{taskManagerId}/metrics";
+            UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
+            builder.queryParam("get", metricsParams);
+
+            Map<String, String> pathParams = new HashMap<>();
+            pathParams.put("taskManagerId", manager.getId());
+            URI uri = builder.buildAndExpand(pathParams).toUri();
+
+            ResponseEntity<String> rsp = restTemplate.exchange(uri, HttpMethod.GET, null, String.class);
+            String body = rsp.getBody();
+            System.out.println("body: " + body);
+        } catch (Exception e) {
+            log.error("queryTaskManagerMetric failed, managerId: {}", manager.getId(), e);
         }
     }
 
@@ -79,11 +119,12 @@ public class MetricPullRunner implements ApplicationRunner {
             TaskManagerDetailsRspDto detailsRspDto = rsp.getBody();
             assert detailsRspDto != null;
             if (detailsRspDto.getNumberSlots().equals(detailsRspDto.getNumberAvailableSlots())) {
-                return;
+//                return;
             }
 
             TaskManagerMetricsEntity entity = mappingEntity(detailsRspDto);
             entity.setTaskManagerId(manager.getId());
+            entity.setTs(System.currentTimeMillis());   // 这里使用当前系统时间，而不使用 返回的心跳时间，没搞清楚那个时间戳为什么长时间都没有发生变化。
             taskManagerMetricsMapper.insert(entity);
         } catch (Exception e) {
             log.error("queryTaskManagerMetric failed, managerId: {}", manager.getId(), e);
@@ -93,7 +134,6 @@ public class MetricPullRunner implements ApplicationRunner {
     private TaskManagerMetricsEntity mappingEntity(TaskManagerDetailsRspDto detailsRspDto) {
         TaskManagerMetricsEntity entity = new TaskManagerMetricsEntity();
         BeanUtils.copyProperties(detailsRspDto.getMetrics(), entity);
-        entity.setTs(detailsRspDto.getTimeSinceLastHeartbeat());
         return entity;
     }
 }
