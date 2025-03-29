@@ -21,6 +21,10 @@ public class TaskManagerMetricsEntity extends TaskManagerMetrics {
 
     private String taskManagerId;
     private Long ts;
+    private Long flinkMemoryManagerUsed;
+    private Long flinkMemoryManagerTotal;
+    private Long jvmMemoryMetaspaceUsed;
+    private Long jvmMemoryMetaspaceMax;
 
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Date created;

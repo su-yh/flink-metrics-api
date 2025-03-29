@@ -25,9 +25,14 @@ CREATE TABLE tm_metric
     shuffle_memory_available          BIGINT,
     shuffle_memory_used               BIGINT,
     shuffle_memory_total              BIGINT,
+    flink_memory_manager_used         BIGINT,
+    flink_memory_manager_total        BIGINT,
+    jvm_memory_metaspace_used         BIGINT,
+    jvm_memory_metaspace_max          BIGINT,
 
-    created                           DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
-    updated                           DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+
+    created                           DATETIME(3) DEFAULT CURRENT_TIMESTAMP (3) COMMENT '创建时间',
+    updated                           DATETIME(3) DEFAULT CURRENT_TIMESTAMP (3) ON UPDATE CURRENT_TIMESTAMP (3),
     PRIMARY KEY (id)
 ) ENGINE = innodb COMMENT "taskManager 指标记录表";
 

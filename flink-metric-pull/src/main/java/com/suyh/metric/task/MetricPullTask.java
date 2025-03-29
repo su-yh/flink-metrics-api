@@ -18,7 +18,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import javax.annotation.PostConstruct;
 import java.net.URI;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -98,7 +97,11 @@ public class MetricPullTask {
 
             ResponseEntity<TaskManagerMetricsByIdRspDto[]> rsp = restTemplate.exchange(uri, HttpMethod.GET, null, TaskManagerMetricsByIdRspDto[].class);
             TaskManagerMetricsByIdRspDto[] rspDtos = rsp.getBody();
-            System.out.println("body: " + Arrays.toString(rspDtos));
+            assert rspDtos != null;
+            TaskManagerMetricsEntity entity = mappingEntity(rspDtos);
+            entity.setTaskManagerId(manager.getId());
+            entity.setTs(System.currentTimeMillis());   // 这里使用当前系统时间，而不使用 返回的心跳时间，没搞清楚那个时间戳为什么长时间都没有发生变化。
+            taskManagerMetricsMapper.insert(entity);
         } catch (Exception e) {
             log.error("queryTaskManagerMetric failed, managerId: {}", manager.getId(), e);
         }
@@ -131,6 +134,43 @@ public class MetricPullTask {
     private TaskManagerMetricsEntity mappingEntity(TaskManagerDetailsRspDto detailsRspDto) {
         TaskManagerMetricsEntity entity = new TaskManagerMetricsEntity();
         BeanUtils.copyProperties(detailsRspDto.getMetrics(), entity);
+        return entity;
+    }
+
+    private TaskManagerMetricsEntity mappingEntity(TaskManagerMetricsByIdRspDto[] rspDtos) {
+        TaskManagerMetricsEntity entity = new TaskManagerMetricsEntity();
+
+        for (TaskManagerMetricsByIdRspDto rspDto : rspDtos) {
+            switch (rspDto.getId()) {
+                case Constants.STATUS_FLINK_MEMORY_MANAGED_USED:
+                    entity.setFlinkMemoryManagerUsed(rspDto.getValue());
+                    break;
+                case Constants.STATUS_FLINK_MEMORY_MANAGED_TOTAL:
+                    entity.setFlinkMemoryManagerTotal(rspDto.getValue());
+                    break;
+                case Constants.STATUS_JVM_MEMORY_METASPACE_USED:
+                    entity.setJvmMemoryMetaspaceUsed(rspDto.getValue());
+                    break;
+                case Constants.STATUS_JVM_MEMORY_METASPACE_MAX:
+                    entity.setJvmMemoryMetaspaceMax(rspDto.getValue());
+                    break;
+                case Constants.STATUS_JVM_MEMORY_HEAP_USED:
+                    entity.setHeapUsed(rspDto.getValue());
+                    break;
+                case Constants.STATUS_JVM_MEMORY_HEAP_MAX:
+                    entity.setHeapMax(rspDto.getValue());
+                    break;
+                case Constants.STATUS_SHUFFLE_NETTY_USED_MEMORY:
+                    entity.setShuffleMemoryUsed(rspDto.getValue());
+                    break;
+                case Constants.STATUS_SHUFFLE_NETTY_TOTAL_MEMORY:
+                    entity.setShuffleMemoryTotal(rspDto.getValue());
+                    break;
+                default:
+                    break;
+            }
+        }
+
         return entity;
     }
 }
