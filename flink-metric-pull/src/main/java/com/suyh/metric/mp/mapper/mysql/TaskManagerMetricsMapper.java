@@ -13,14 +13,12 @@ import java.util.List;
  */
 @Mapper
 public interface TaskManagerMetricsMapper extends BaseMapperX<TaskManagerMetricsEntity> {
-    default List<TaskManagerMetricsEntity> listAll(String flinkWebHost, Integer flinkWebPort) {
+    default List<TaskManagerMetricsEntity> listAll(String flinkEnvName) {
         LambdaQueryWrapperX<TaskManagerMetricsEntity> queryWrapperX = build();
 
-        queryWrapperX.eqIfPresent(TaskManagerMetricsEntity::getFlinkWebHost, flinkWebHost);
-        queryWrapperX.eqIfPresent(TaskManagerMetricsEntity::getFlinkWebPort, flinkWebPort);
+        queryWrapperX.eqIfPresent(TaskManagerMetricsEntity::getFlinkEnvName, flinkEnvName);
 
-        queryWrapperX.orderByAsc(TaskManagerMetricsEntity::getFlinkWebHost)
-                .orderByAsc(TaskManagerMetricsEntity::getFlinkWebPort)
+        queryWrapperX.orderByAsc(TaskManagerMetricsEntity::getFlinkEnvName)
                 .orderByAsc(TaskManagerMetricsEntity::getTs);
 
         return selectList(queryWrapperX);

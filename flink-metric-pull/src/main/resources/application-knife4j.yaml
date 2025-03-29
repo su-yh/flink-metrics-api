@@ -21,6 +21,11 @@ springdoc:
         - "/task/manager/**"
       packages-to-scan:
         - "com.suyh.metric.controller"
+    - group: 'flink-cluster-env'
+      paths-to-match:
+        - "/flink/cluster/env/**"
+      packages-to-scan:
+        - "com.suyh.metric.controller"
 
 ---
 spring:

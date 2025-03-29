@@ -1,7 +1,7 @@
 package com.suyh.metric.controller;
 
-import com.suyh.metric.mp.entity.mysql.TaskManagerMetricsEntity;
-import com.suyh.metric.service.TaskManagerMetricsService;
+import com.suyh.metric.mp.entity.mysql.FlinkEnvConfigEntity;
+import com.suyh.metric.service.FlinkEnvConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -10,29 +10,23 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * @author suyh
- * @since 2025-03-29
- */
-@Tag(name = "TaskManager指标")
+@Tag(name = "flink 集群环境配置")
 @RestController
-@RequestMapping("/task/manager")
+@RequestMapping("/flink/cluster/env")
 @RequiredArgsConstructor
 @Validated
 @Slf4j
-public class TaskManagerMetricsController {
-    private final TaskManagerMetricsService taskManagerMetricsService;
+public class FlinkEnvConfigController {
+    private final FlinkEnvConfigService flinkEnvConfigService;
 
     @CrossOrigin
-    @Operation(summary = "【TaskManager指标】查询-全量")
+    @Operation(summary = "【flink 集群环境配置】查询-全量")
     @RequestMapping(value = "/listAll", method = RequestMethod.GET)
-    public List<TaskManagerMetricsEntity> listAll(
-            @RequestParam("flinkEnvName") String flinkEnvName) {
-        return taskManagerMetricsService.listAll(flinkEnvName);
+    public List<FlinkEnvConfigEntity> listAll() {
+        return flinkEnvConfigService.listAll();
     }
 }

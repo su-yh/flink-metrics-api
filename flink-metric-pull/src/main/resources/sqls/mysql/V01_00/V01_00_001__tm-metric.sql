@@ -3,8 +3,7 @@
 CREATE TABLE tm_metric
 (
     id                                BIGINT AUTO_INCREMENT COMMENT '主键',
-    flink_web_host                    VARCHAR(20) NOT NULL COMMENT 'flink web 主机地址',
-    flink_web_port                    INT         NOT NULL COMMENT 'flink web 端口',
+    flink_env_name                    VARCHAR(20) NOT NULL COMMENT 'flink 环境名称',
     ts                                BIGINT      NOT NULL COMMENT '时间戳',
     heap_used                         BIGINT,
     heap_committed                    BIGINT,
@@ -36,4 +35,4 @@ CREATE TABLE tm_metric
 ) ENGINE = innodb COMMENT "taskManager 指标记录表";
 
 ALTER TABLE tm_metric
-    ADD UNIQUE INDEX idx_tm_metric_h_p_t(flink_web_host, flink_web_port, ts);
+    ADD UNIQUE INDEX uni_tm_metric_n_t(flink_env_name, ts);
