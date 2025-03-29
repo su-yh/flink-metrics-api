@@ -1,11 +1,10 @@
--- taskManager 指标记录表
+-- taskManager 指标记录表 目录来说只处理一个task manager 的指标，如果有多个task manager 暂时还处理不了。
 -- DROP TABLE if EXISTS tm_metric;
 CREATE TABLE tm_metric
 (
     id                                BIGINT AUTO_INCREMENT COMMENT '主键',
---    host                              VARCHAR(20) NOT NULL COMMENT '主机IP 地址',
---    port                              INT         NOT NULL COMMENT '端口',
-    task_manager_id                   VARCHAR(50) NOT NULL COMMENT 'task_manager_id',
+    flink_web_host                    VARCHAR(20) NOT NULL COMMENT 'flink web 主机地址',
+    flink_web_port                    INT         NOT NULL COMMENT 'flink web 端口',
     ts                                BIGINT      NOT NULL COMMENT '时间戳',
     heap_used                         BIGINT,
     heap_committed                    BIGINT,
@@ -37,4 +36,4 @@ CREATE TABLE tm_metric
 ) ENGINE = innodb COMMENT "taskManager 指标记录表";
 
 ALTER TABLE tm_metric
-    ADD UNIQUE INDEX idx_tm_metric_t_t(task_manager_id, ts);
+    ADD UNIQUE INDEX idx_tm_metric_h_p_t(flink_web_host, flink_web_port, ts);

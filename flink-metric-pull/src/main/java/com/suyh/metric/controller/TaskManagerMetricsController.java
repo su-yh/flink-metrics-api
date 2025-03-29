@@ -31,7 +31,9 @@ public class TaskManagerMetricsController {
     @CrossOrigin
     @Operation(summary = "【TaskManager指标】查询-全量")
     @RequestMapping(value = "/listAll", method = RequestMethod.GET)
-    public List<TaskManagerMetricsEntity> listAll(@RequestParam("taskManagerId") String taskManagerId) {
-        return taskManagerMetricsService.listAll(taskManagerId);
+    public List<TaskManagerMetricsEntity> listAll(
+            @RequestParam("flinkWebHost") String flinkWebHost,
+            @RequestParam("flinkWebPort") Integer flinkWebPort) {
+        return taskManagerMetricsService.listAll(flinkWebHost, flinkWebPort);
     }
 }

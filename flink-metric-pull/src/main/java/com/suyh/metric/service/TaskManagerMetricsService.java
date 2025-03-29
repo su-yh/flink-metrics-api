@@ -18,7 +18,7 @@ import java.util.List;
 public class TaskManagerMetricsService {
     private final TaskManagerMetricsMapper taskManagerMetricsMapper;
 
-    public List<TaskManagerMetricsEntity> listAll(String taskManagerId) {
-        return taskManagerMetricsMapper.listAll(taskManagerId);
+    public List<TaskManagerMetricsEntity> listAll(String flinkWebHost, Integer flinkWebPort) {
+        return taskManagerMetricsMapper.listAll(flinkWebHost, flinkWebPort);
     }
 }

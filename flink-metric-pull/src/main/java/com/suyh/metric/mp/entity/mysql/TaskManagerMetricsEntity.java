@@ -19,7 +19,9 @@ public class TaskManagerMetricsEntity extends TaskManagerMetrics {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private String taskManagerId;
+    // private String taskManagerId;
+    private String flinkWebHost;
+    private Integer flinkWebPort;
     private Long ts;
     private Long flinkMemoryManagerUsed;
     private Long flinkMemoryManagerTotal;

@@ -39,9 +39,13 @@ public class MetricPullTask {
 
     @PostConstruct
     public void init() throws Exception {
-        managers = queryManager();
+        try {
+            managers = queryManager();
 
-        scheduledExecutorService.scheduleWithFixedDelay(this::task, 10, 1, TimeUnit.SECONDS);
+            scheduledExecutorService.scheduleWithFixedDelay(this::task, 10, 1, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("init failed.");
+        }
     }
 
     private List<TaskManagerInfoDetail> queryManager() {
@@ -99,7 +103,8 @@ public class MetricPullTask {
             TaskManagerMetricsByIdRspDto[] rspDtos = rsp.getBody();
             assert rspDtos != null;
             TaskManagerMetricsEntity entity = mappingEntity(rspDtos);
-            entity.setTaskManagerId(manager.getId());
+            entity.setFlinkWebHost("192.168.8.143");
+            entity.setFlinkWebPort(8991);
             entity.setTs(System.currentTimeMillis());   // 这里使用当前系统时间，而不使用 返回的心跳时间，没搞清楚那个时间戳为什么长时间都没有发生变化。
             taskManagerMetricsMapper.insert(entity);
         } catch (Exception e) {
@@ -123,7 +128,8 @@ public class MetricPullTask {
 //            }
 
             TaskManagerMetricsEntity entity = mappingEntity(detailsRspDto);
-            entity.setTaskManagerId(manager.getId());
+            entity.setFlinkWebHost("192.168.8.143");
+            entity.setFlinkWebPort(8991);
             entity.setTs(System.currentTimeMillis());   // 这里使用当前系统时间，而不使用 返回的心跳时间，没搞清楚那个时间戳为什么长时间都没有发生变化。
             taskManagerMetricsMapper.insert(entity);
         } catch (Exception e) {
