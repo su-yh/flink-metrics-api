@@ -10,7 +10,7 @@ import lombok.Data;
 import java.util.Date;
 
 @Data
-@TableName(value = "tm_metric", autoResultMap = true)
+@TableName(value = "flink_env_config", autoResultMap = true)
 public class FlinkEnvConfigEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
