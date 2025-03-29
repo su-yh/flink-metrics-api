@@ -4,11 +4,11 @@ import com.suyh.metric.constant.Constants;
 import com.suyh.metric.dto.rsp.TaskManagerInfoDetail;
 import com.suyh.metric.dto.rsp.TaskManagerMetricsByIdRspDto;
 import com.suyh.metric.dto.rsp.TaskManagersInfoRspDto;
+import com.suyh.metric.mp.FlinkClusterDetail;
 import com.suyh.metric.mp.entity.mysql.FlinkEnvConfigEntity;
 import com.suyh.metric.mp.entity.mysql.TaskManagerMetricsEntity;
 import com.suyh.metric.mp.mapper.mysql.TaskManagerMetricsMapper;
 import com.suyh.metric.service.FlinkEnvConfigService;
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpMethod;
@@ -31,12 +31,6 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 @Slf4j
 public class MetricPullTask {
-    @Data
-    public static class FlinkClusterDetail {
-        private FlinkEnvConfigEntity flinkEnvConfigEntity;
-        private String taskManagerId;
-    }
-
     private final RestTemplate restTemplate = new RestTemplate();
     private final ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1);
     // key: env
@@ -60,24 +54,11 @@ public class MetricPullTask {
             mapFlinkClusterDetail.put(flinkEnvConfigEntity.getFlinkEnvName(), detail);
         }
 
-        scheduledExecutorService.scheduleWithFixedDelay(this::task, 10, 1, TimeUnit.SECONDS);
-    }
-
-    private List<TaskManagerInfoDetail> queryManager() {
-        String url = "http://192.168.8.143:8991/taskmanagers";
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
-        URI uri = builder.build().toUri();
-        ResponseEntity<TaskManagersInfoRspDto> rsp = restTemplate.exchange(uri, HttpMethod.GET, null, TaskManagersInfoRspDto.class);
-        TaskManagersInfoRspDto body = rsp.getBody();
-        return body.getManagers();
+        scheduledExecutorService.scheduleWithFixedDelay(this::task, 1, 1, TimeUnit.SECONDS);
     }
 
     public void task() {
-        mapFlinkClusterDetail.forEach((env, flinkClusterDetail) -> {
-            queryTaskManagerMetricPlus(flinkClusterDetail);
-        });
-
-
+        mapFlinkClusterDetail.forEach((env, flinkClusterDetail) -> queryTaskManagerMetricPlus(flinkClusterDetail));
     }
 
 //    private final List<String> metricsParamsList = Arrays.asList("Status.JVM.Memory.Heap.Used",
