@@ -18,6 +18,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import javax.annotation.PostConstruct;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +98,7 @@ public class MetricPullTask {
 
             ResponseEntity<TaskManagerMetricsByIdRspDto[]> rsp = restTemplate.exchange(uri, HttpMethod.GET, null, TaskManagerMetricsByIdRspDto[].class);
             TaskManagerMetricsByIdRspDto[] rspDtos = rsp.getBody();
-            System.out.println("body: " + rspDtos);
+            System.out.println("body: " + Arrays.toString(rspDtos));
         } catch (Exception e) {
             log.error("queryTaskManagerMetric failed, managerId: {}", manager.getId(), e);
         }
