@@ -3,13 +3,13 @@ package com.suyh.metric.task;
 import com.suyh.metric.constant.Constants;
 import com.suyh.metric.dto.rsp.TaskManagerDetailsRspDto;
 import com.suyh.metric.dto.rsp.TaskManagerInfoDetail;
+import com.suyh.metric.dto.rsp.TaskManagerMetricsByIdRspDto;
 import com.suyh.metric.dto.rsp.TaskManagersInfoRspDto;
 import com.suyh.metric.mp.entity.mysql.TaskManagerMetricsEntity;
 import com.suyh.metric.mp.mapper.mysql.TaskManagerMetricsMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
-import org.springframework.boot.ApplicationArguments;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -95,9 +95,9 @@ public class MetricPullTask {
             pathParams.put("taskManagerId", manager.getId());
             URI uri = builder.buildAndExpand(pathParams).toUri();
 
-            ResponseEntity<String> rsp = restTemplate.exchange(uri, HttpMethod.GET, null, String.class);
-            String body = rsp.getBody();
-            System.out.println("body: " + body);
+            ResponseEntity<TaskManagerMetricsByIdRspDto[]> rsp = restTemplate.exchange(uri, HttpMethod.GET, null, TaskManagerMetricsByIdRspDto[].class);
+            TaskManagerMetricsByIdRspDto[] rspDtos = rsp.getBody();
+            System.out.println("body: " + rspDtos);
         } catch (Exception e) {
             log.error("queryTaskManagerMetric failed, managerId: {}", manager.getId(), e);
         }
