@@ -164,6 +164,7 @@ public class MetricPullTaskAsync {
             entity.setFlinkEnvName(flinkEnvConfigEntity.getFlinkEnvName());
             entity.setTs(System.currentTimeMillis());   // 这里使用当前系统时间，而不使用 返回的心跳时间，没搞清楚那个时间戳为什么长时间都没有发生变化。
             taskManagerMetricsMapper.insert(entity);
+            log.info("task manager metrics finished, env: {}", event.env);
         } catch (Exception e) {
             // 失败，则重置taskManagerId，使得重新
             flinkClusterDetail.setTaskManagerId(null);
