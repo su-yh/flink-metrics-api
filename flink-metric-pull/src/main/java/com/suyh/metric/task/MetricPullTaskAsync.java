@@ -1,7 +1,6 @@
 package com.suyh.metric.task;
 
 import com.suyh.metric.constant.Constants;
-import com.suyh.metric.dto.rsp.TaskManagerInfoDetail;
 import com.suyh.metric.dto.rsp.TaskManagerMetricsByIdRspDto;
 import com.suyh.metric.dto.rsp.TaskManagersInfoRspDto;
 import com.suyh.metric.mp.FlinkClusterDetail;
@@ -11,14 +10,10 @@ import com.suyh.metric.mp.mapper.mysql.TaskManagerMetricsMapper;
 import com.suyh.metric.service.FlinkEnvConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriBuilder;
-import org.springframework.web.util.UriComponentsBuilder;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.PostConstruct;
@@ -66,7 +61,6 @@ public class MetricPullTaskAsync {
     }
 
     public void task() {
-//        mapFlinkClusterDetail.forEach((env, flinkClusterDetail) -> queryTaskManagerMetricPlus(flinkClusterDetail));
         List<Mono<?>> requests = new ArrayList<>();
 
         mapFlinkClusterDetail.forEach((env, detail) -> {
@@ -82,6 +76,7 @@ public class MetricPullTaskAsync {
                         .build();
 
                 Mono<TaskManagersInfoRspDto> responseMono = webClient.get().uri(uriFunction).retrieve().bodyToMono(TaskManagersInfoRspDto.class);
+                responseMono.subscribe(res -> System.out.println("taskManagerId result: " + res.getClass().getSimpleName()));
                 requests.add(responseMono);
             } else {
                 String metricsParams = String.join(",", Constants.STATUS_ID_LIST);
@@ -96,85 +91,86 @@ public class MetricPullTaskAsync {
 
                 Mono<TaskManagerMetricsByIdRspDto[]> responseMono = webClient.get().uri(uriFunction).retrieve()
                         .bodyToMono(TaskManagerMetricsByIdRspDto[].class);
+                responseMono.subscribe(res -> System.out.println("metrics result: " + res.getClass().getSimpleName()));
                 requests.add(responseMono);
             }
         });
 
-        Flux<Object> dynamicFlux = Flux.merge(requests);
-        dynamicFlux.subscribe(res -> System.out.println("res: " + res.getClass().getSimpleName()), error -> System.out.println("Error: " + error));
-
-        dynamicFlux.blockLast();
-        System.out.println("blockLast finished.");
+//        Flux<Object> dynamicFlux = Flux.merge(requests);
+//        dynamicFlux.subscribe(res -> System.out.println("res: " + res.getClass().getSimpleName()), error -> System.out.println("Error: " + error));
+//
+//        dynamicFlux.blockLast();
+//        System.out.println("blockLast finished.");
     }
 
-    private void queryTaskManagerMetricPlus(FlinkClusterDetail flinkClusterDetail) {
-        // 这里get 后面的值应该是可以通过api: http://192.168.8.143:8991/taskmanagers/localhost:34339-19078e/metrics 得到。
-        // http://192.168.8.143:8991/taskmanagers/localhost:34339-19078e/metrics?get=Status.JVM.Memory.Heap.Used,Status.JVM.Memory.Heap.Max,Status.Shuffle.Netty.UsedMemory,Status.Shuffle.Netty.TotalMemory,Status.Flink.Memory.Managed.Used,Status.Flink.Memory.Managed.Total,Status.JVM.Memory.Metaspace.Used,Status.JVM.Memory.Metaspace.Max
-        FlinkEnvConfigEntity flinkEnvConfigEntity = flinkClusterDetail.getFlinkEnvConfigEntity();
-        String taskManagerId = flinkClusterDetail.getTaskManagerId();
-        if (!StringUtils.hasText(taskManagerId)) {
-            taskManagerId = queryTaskManagerId(flinkEnvConfigEntity);
-            if (!StringUtils.hasText(taskManagerId)) {
-                log.warn("QUERY TASK MANAGER ID FAILED, FLINK CLUSTER ENV: {}", flinkEnvConfigEntity.getFlinkEnvName());
-                return;
-            }
-        }
-
-        try {
-            String metricsParams = String.join(",", Constants.STATUS_ID_LIST);
-            String url = String.format("http://%s:%d/taskmanagers/{taskManagerId}/metrics",
-                    flinkEnvConfigEntity.getFlinkWebHost(), flinkEnvConfigEntity.getFlinkWebPort());
-            UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
-            builder.queryParam("get", metricsParams);
-
-            Map<String, String> pathParams = new HashMap<>();
-            pathParams.put("taskManagerId", taskManagerId);
-            URI uri = builder.buildAndExpand(pathParams).toUri();
-
-            ResponseEntity<TaskManagerMetricsByIdRspDto[]> rsp = restTemplate.exchange(uri, HttpMethod.GET, null, TaskManagerMetricsByIdRspDto[].class);
-            TaskManagerMetricsByIdRspDto[] rspDtos = rsp.getBody();
-            assert rspDtos != null;
-            TaskManagerMetricsEntity entity = mappingEntity(rspDtos);
-            entity.setFlinkEnvName(flinkEnvConfigEntity.getFlinkEnvName());
-            entity.setTs(System.currentTimeMillis());   // 这里使用当前系统时间，而不使用 返回的心跳时间，没搞清楚那个时间戳为什么长时间都没有发生变化。
-            taskManagerMetricsMapper.insert(entity);
-        } catch (Exception e) {
-            log.error("queryTaskManagerMetric failed, taskManagerId: {}", taskManagerId, e);
-            // 发起taskManager 请求出现了异常，则认为这个taskManagerId 失效了，需要重新拉取最新的
-            flinkClusterDetail.setTaskManagerId(null);
-        }
-    }
-
-    private String queryTaskManagerId(FlinkEnvConfigEntity flinkEnvConfigEntity) {
-        String taskManagerId = null;
-        try {
-            String url = String.format("http://%s:%d/taskmanagers",
-                    flinkEnvConfigEntity.getFlinkWebHost(), flinkEnvConfigEntity.getFlinkWebPort());
-            UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
-            URI uri = builder.build().toUri();
-            ResponseEntity<TaskManagersInfoRspDto> rsp = restTemplate.exchange(uri, HttpMethod.GET, null, TaskManagersInfoRspDto.class);
-            TaskManagersInfoRspDto body = rsp.getBody();
-            if (body == null) {
-                return null;
-            }
-
-            List<TaskManagerInfoDetail> managers = body.getManagers();
-            if (managers == null || managers.isEmpty()) {
-                return null;
-            }
-
-            TaskManagerInfoDetail taskManagerInfoDetail = managers.get(0);
-            if (taskManagerInfoDetail == null) {
-                return null;
-            }
-
-            taskManagerId = taskManagerInfoDetail.getId();
-        } catch (Exception e) {
-            log.error("queryTaskManagerId failed. env: {}", flinkEnvConfigEntity.getFlinkEnvName());
-        }
-
-        return taskManagerId;
-    }
+//    private void queryTaskManagerMetricPlus(FlinkClusterDetail flinkClusterDetail) {
+//        // 这里get 后面的值应该是可以通过api: http://192.168.8.143:8991/taskmanagers/localhost:34339-19078e/metrics 得到。
+//        // http://192.168.8.143:8991/taskmanagers/localhost:34339-19078e/metrics?get=Status.JVM.Memory.Heap.Used,Status.JVM.Memory.Heap.Max,Status.Shuffle.Netty.UsedMemory,Status.Shuffle.Netty.TotalMemory,Status.Flink.Memory.Managed.Used,Status.Flink.Memory.Managed.Total,Status.JVM.Memory.Metaspace.Used,Status.JVM.Memory.Metaspace.Max
+//        FlinkEnvConfigEntity flinkEnvConfigEntity = flinkClusterDetail.getFlinkEnvConfigEntity();
+//        String taskManagerId = flinkClusterDetail.getTaskManagerId();
+//        if (!StringUtils.hasText(taskManagerId)) {
+//            taskManagerId = queryTaskManagerId(flinkEnvConfigEntity);
+//            if (!StringUtils.hasText(taskManagerId)) {
+//                log.warn("QUERY TASK MANAGER ID FAILED, FLINK CLUSTER ENV: {}", flinkEnvConfigEntity.getFlinkEnvName());
+//                return;
+//            }
+//        }
+//
+//        try {
+//            String metricsParams = String.join(",", Constants.STATUS_ID_LIST);
+//            String url = String.format("http://%s:%d/taskmanagers/{taskManagerId}/metrics",
+//                    flinkEnvConfigEntity.getFlinkWebHost(), flinkEnvConfigEntity.getFlinkWebPort());
+//            UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
+//            builder.queryParam("get", metricsParams);
+//
+//            Map<String, String> pathParams = new HashMap<>();
+//            pathParams.put("taskManagerId", taskManagerId);
+//            URI uri = builder.buildAndExpand(pathParams).toUri();
+//
+//            ResponseEntity<TaskManagerMetricsByIdRspDto[]> rsp = restTemplate.exchange(uri, HttpMethod.GET, null, TaskManagerMetricsByIdRspDto[].class);
+//            TaskManagerMetricsByIdRspDto[] rspDtos = rsp.getBody();
+//            assert rspDtos != null;
+//            TaskManagerMetricsEntity entity = mappingEntity(rspDtos);
+//            entity.setFlinkEnvName(flinkEnvConfigEntity.getFlinkEnvName());
+//            entity.setTs(System.currentTimeMillis());   // 这里使用当前系统时间，而不使用 返回的心跳时间，没搞清楚那个时间戳为什么长时间都没有发生变化。
+//            taskManagerMetricsMapper.insert(entity);
+//        } catch (Exception e) {
+//            log.error("queryTaskManagerMetric failed, taskManagerId: {}", taskManagerId, e);
+//            // 发起taskManager 请求出现了异常，则认为这个taskManagerId 失效了，需要重新拉取最新的
+//            flinkClusterDetail.setTaskManagerId(null);
+//        }
+//    }
+//
+//    private String queryTaskManagerId(FlinkEnvConfigEntity flinkEnvConfigEntity) {
+//        String taskManagerId = null;
+//        try {
+//            String url = String.format("http://%s:%d/taskmanagers",
+//                    flinkEnvConfigEntity.getFlinkWebHost(), flinkEnvConfigEntity.getFlinkWebPort());
+//            UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
+//            URI uri = builder.build().toUri();
+//            ResponseEntity<TaskManagersInfoRspDto> rsp = restTemplate.exchange(uri, HttpMethod.GET, null, TaskManagersInfoRspDto.class);
+//            TaskManagersInfoRspDto body = rsp.getBody();
+//            if (body == null) {
+//                return null;
+//            }
+//
+//            List<TaskManagerInfoDetail> managers = body.getManagers();
+//            if (managers == null || managers.isEmpty()) {
+//                return null;
+//            }
+//
+//            TaskManagerInfoDetail taskManagerInfoDetail = managers.get(0);
+//            if (taskManagerInfoDetail == null) {
+//                return null;
+//            }
+//
+//            taskManagerId = taskManagerInfoDetail.getId();
+//        } catch (Exception e) {
+//            log.error("queryTaskManagerId failed. env: {}", flinkEnvConfigEntity.getFlinkEnvName());
+//        }
+//
+//        return taskManagerId;
+//    }
 
     private TaskManagerMetricsEntity mappingEntity(TaskManagerMetricsByIdRspDto[] rspDtos) {
         TaskManagerMetricsEntity entity = new TaskManagerMetricsEntity();
