@@ -61,24 +61,6 @@ public class MetricPullTask {
         mapFlinkClusterDetail.forEach((env, flinkClusterDetail) -> queryTaskManagerMetricPlus(flinkClusterDetail));
     }
 
-//    private final List<String> metricsParamsList = Arrays.asList("Status.JVM.Memory.Heap.Used",
-//            "Status.JVM.Memory.Heap.Max",
-//            "Status.Shuffle.Netty.UsedMemory",
-//            "Status.Shuffle.Netty.TotalMemory",
-//            "Status.Flink.Memory.Managed.Used",
-//            "Status.Flink.Memory.Managed.Total",
-//            "Status.JVM.Memory.Metaspace.Used",
-//            "Status.JVM.Memory.Metaspace.Max");
-//
-//    private static final String metricsParams = "Status.JVM.Memory.Heap.Used," +
-//            "Status.JVM.Memory.Heap.Max," +
-//            "Status.Shuffle.Netty.UsedMemory," +
-//            "Status.Shuffle.Netty.TotalMemory," +
-//            "Status.Flink.Memory.Managed.Used," +
-//            "Status.Flink.Memory.Managed.Total," +
-//            "Status.JVM.Memory.Metaspace.Used," +
-//            "Status.JVM.Memory.Metaspace.Max";
-
     private void queryTaskManagerMetricPlus(FlinkClusterDetail flinkClusterDetail) {
         // 这里get 后面的值应该是可以通过api: http://192.168.8.143:8991/taskmanagers/localhost:34339-19078e/metrics 得到。
         // http://192.168.8.143:8991/taskmanagers/localhost:34339-19078e/metrics?get=Status.JVM.Memory.Heap.Used,Status.JVM.Memory.Heap.Max,Status.Shuffle.Netty.UsedMemory,Status.Shuffle.Netty.TotalMemory,Status.Flink.Memory.Managed.Used,Status.Flink.Memory.Managed.Total,Status.JVM.Memory.Metaspace.Used,Status.JVM.Memory.Metaspace.Max
@@ -112,6 +94,8 @@ public class MetricPullTask {
             taskManagerMetricsMapper.insert(entity);
         } catch (Exception e) {
             log.error("queryTaskManagerMetric failed, taskManagerId: {}", taskManagerId, e);
+            // 发起taskManager 请求出现了异常，则认为这个taskManagerId 失效了，需要重新拉取最新的
+            flinkClusterDetail.setTaskManagerId(null);
         }
     }
 
