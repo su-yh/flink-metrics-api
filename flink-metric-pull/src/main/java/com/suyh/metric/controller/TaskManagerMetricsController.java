@@ -30,9 +30,15 @@ public class TaskManagerMetricsController {
 
     @CrossOrigin
     @Operation(summary = "【TaskManager指标】查询-全量")
-    @RequestMapping(value = "/listAll", method = RequestMethod.GET)
-    public List<TaskManagerMetricsEntity> listAll(
-            @RequestParam("flinkEnvName") String flinkEnvName) {
-        return taskManagerMetricsService.listAll(flinkEnvName);
+    @RequestMapping(value = "/listQuery", method = RequestMethod.GET)
+    public List<TaskManagerMetricsEntity> listQuery(
+            @RequestParam("flinkEnvName") String flinkEnvName,
+            @RequestParam(value = "maxNumber", required = false, defaultValue = "3600") Integer maxNumber,
+            @RequestParam(value = "startTs", required = false) Long startTs,
+            @RequestParam(value = "endTs", required = false) Long endTs) {
+        if (maxNumber > 3600) {
+            maxNumber = 3600;
+        }
+        return taskManagerMetricsService.listQuery(flinkEnvName, maxNumber, startTs, endTs);
     }
 }

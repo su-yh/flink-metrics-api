@@ -18,7 +18,7 @@ import java.util.List;
 public class TaskManagerMetricsService {
     private final TaskManagerMetricsMapper taskManagerMetricsMapper;
 
-    public List<TaskManagerMetricsEntity> listAll(String flinkEnvName) {
-        return taskManagerMetricsMapper.listAll(flinkEnvName);
+    public List<TaskManagerMetricsEntity> listQuery(String flinkEnvName, Integer maxNumber, Long startTs, Long endTs) {
+        return taskManagerMetricsMapper.listQuery(flinkEnvName, maxNumber, startTs, endTs);
     }
 }

@@ -13,13 +13,18 @@ import java.util.List;
  */
 @Mapper
 public interface TaskManagerMetricsMapper extends BaseMapperX<TaskManagerMetricsEntity> {
-    default List<TaskManagerMetricsEntity> listAll(String flinkEnvName) {
+    default List<TaskManagerMetricsEntity> listQuery(String flinkEnvName, Integer maxNumber, Long startTs, Long endTs) {
         LambdaQueryWrapperX<TaskManagerMetricsEntity> queryWrapperX = build();
 
         queryWrapperX.eqIfPresent(TaskManagerMetricsEntity::getFlinkEnvName, flinkEnvName);
+        queryWrapperX.geIfPresent(TaskManagerMetricsEntity::getTs, startTs);
+        queryWrapperX.ltIfPresent(TaskManagerMetricsEntity::getTs, endTs);
 
         queryWrapperX.orderByAsc(TaskManagerMetricsEntity::getFlinkEnvName)
                 .orderByAsc(TaskManagerMetricsEntity::getTs);
+
+        // 最多查询3600 条
+        queryWrapperX.last("limit " + maxNumber);
 
         return selectList(queryWrapperX);
     }
