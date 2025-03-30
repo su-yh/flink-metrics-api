@@ -1,7 +1,6 @@
 package com.suyh.metric.task;
 
 import com.suyh.metric.constant.Constants;
-import com.suyh.metric.dto.rsp.TaskManagerInfoDetail;
 import com.suyh.metric.dto.rsp.TaskManagerMetricsByIdRspDto;
 import com.suyh.metric.dto.rsp.TaskManagersInfoRspDto;
 import com.suyh.metric.mp.FlinkClusterDetail;
@@ -9,12 +8,17 @@ import com.suyh.metric.mp.entity.mysql.FlinkEnvConfigEntity;
 import com.suyh.metric.mp.entity.mysql.TaskManagerMetricsEntity;
 import com.suyh.metric.mp.mapper.mysql.TaskManagerMetricsMapper;
 import com.suyh.metric.service.FlinkEnvConfigService;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriBuilder;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.PostConstruct;
@@ -40,6 +44,7 @@ public class MetricPullTaskAsync {
     // key: env
     private final Map<String, FlinkClusterDetail> mapFlinkClusterDetail = new HashMap<>();
 
+    private final ApplicationContext context;
     private final TaskManagerMetricsMapper taskManagerMetricsMapper;
 
     private final FlinkEnvConfigService flinkEnvConfigService;
@@ -61,8 +66,50 @@ public class MetricPullTaskAsync {
         scheduledExecutorService.scheduleWithFixedDelay(this::task, 1, 1, TimeUnit.SECONDS);
     }
 
+    public static enum FlinkApi {
+        QUERY_TASK_MANAGERS("queryTaskManager"),
+        QUERY_MANAGER_METRICS("queryManagerMetrics"),
+        ;
+
+        public final String code;
+
+        FlinkApi(String code) {
+            this.code = code;
+        }
+    }
+
+    @Data
+    public static class TmpVo {
+        private String env;
+        private FlinkApi flinkApi;
+        private Class<?> rspClazz;
+        private Object rspDto;
+    }
+
+    public static class QueryTaskManagersSuccessEvent extends ApplicationEvent {
+        public final String env;
+        public final TaskManagersInfoRspDto rspDto;
+
+        public QueryTaskManagersSuccessEvent(String env, TaskManagersInfoRspDto rspDto) {
+            super(env);
+            this.env = env;
+            this.rspDto = rspDto;
+        }
+    }
+
+    public static class QueryTaskManagerMetricsSuccessEvent extends ApplicationEvent {
+        public final String env;
+        public final TaskManagerMetricsByIdRspDto[] rspDtos;
+
+        public QueryTaskManagerMetricsSuccessEvent(String env, TaskManagerMetricsByIdRspDto[] rspDtos) {
+            super(env);
+            this.env = env;
+            this.rspDtos = rspDtos;
+        }
+    }
+
     public void task() {
-        List<Mono<?>> requests = new ArrayList<>();
+        List<Mono<String>> requests = new ArrayList<>();
 
         mapFlinkClusterDetail.forEach((env, detail) -> {
             FlinkEnvConfigEntity flinkEnvConfigEntity = detail.getFlinkEnvConfigEntity();
@@ -77,38 +124,29 @@ public class MetricPullTaskAsync {
                         .build();
 
                 Mono<TaskManagersInfoRspDto> responseMono = webClient.get().uri(uriFunction).retrieve().bodyToMono(TaskManagersInfoRspDto.class);
-                //            TaskManagersInfoRspDto body = rsp.getBody();
-//            if (body == null) {
-//                return null;
-//            }
+                Mono<String> monoResult = responseMono.doOnSuccess(rspDto -> context.publishEvent(new QueryTaskManagersSuccessEvent(env, rspDto)))
+                        .doOnError(error -> System.out.println("error: " + error))
+                        .map(rspDto -> "OK");
+//                Mono<ApplicationEvent> monoResult = responseMono.map(rspDto -> {
+//                    return new QueryTaskManagersSuccessEvent(rspDto);
+//                    return () -> {
+//                        if (rspDto == null) {
+//                            return;
+//                        }
+//                        List<TaskManagerInfoDetail> managers = rspDto.getManagers();
+//                        if (managers == null || managers.isEmpty()) {
+//                            return;
+//                        }
 //
-//            List<TaskManagerInfoDetail> managers = body.getManagers();
-//            if (managers == null || managers.isEmpty()) {
-//                return null;
-//            }
+//                        TaskManagerInfoDetail taskManagerInfoDetail = managers.get(0);
+//                        if (taskManagerInfoDetail == null) {
+//                            return;
+//                        }
 //
-//            TaskManagerInfoDetail taskManagerInfoDetail = managers.get(0);
-//            if (taskManagerInfoDetail == null) {
-//                return null;
-//            }
-//
-//            taskManagerId = taskManagerInfoDetail.getId();
-                responseMono.subscribe(taskManagersInfoRspDto -> {
-                    System.out.println("taskManagerId result: " + taskManagersInfoRspDto.getClass().getSimpleName());
-                    List<TaskManagerInfoDetail> managers = taskManagersInfoRspDto.getManagers();
-                    if (managers == null || managers.isEmpty()) {
-                        return;
-                    }
-
-                    TaskManagerInfoDetail managerInfoDetail = managers.get(0);
-                    if (managerInfoDetail == null) {
-                        return;
-                    }
-
-                    detail.setTaskManagerId(managerInfoDetail.getId());
-                    System.out.println("taskManagerId: " + detail.getTaskManagerId());
-                });
-                requests.add(responseMono);
+//                        detail.setTaskManagerId(taskManagerInfoDetail.getId());
+//                    };
+//                });
+                requests.add(monoResult);
             } else {
                 String metricsParams = String.join(",", Constants.STATUS_ID_LIST);
                 // http://%s:%d/taskmanagers/{taskManagerId}/metrics?get=xxx,xxx,xxx,xxx
@@ -122,16 +160,52 @@ public class MetricPullTaskAsync {
 
                 Mono<TaskManagerMetricsByIdRspDto[]> responseMono = webClient.get().uri(uriFunction).retrieve()
                         .bodyToMono(TaskManagerMetricsByIdRspDto[].class);
-                responseMono.subscribe(res -> System.out.println("metrics result: " + res.getClass().getSimpleName()));
-                requests.add(responseMono);
+
+                Mono<String> monoResult = responseMono.doOnSuccess(rspDtos -> context.publishEvent(new QueryTaskManagerMetricsSuccessEvent(env, rspDtos)))
+                        .doOnError(error -> detail.setTaskManagerId(null))
+                        .map(rspDtos -> "OK");
+                requests.add(monoResult);
             }
         });
 
-//        Flux<Object> dynamicFlux = Flux.merge(requests);
-//        dynamicFlux.subscribe(res -> System.out.println("res: " + res.getClass().getSimpleName()), error -> System.out.println("Error: " + error));
-//
-//        dynamicFlux.blockLast();
-//        System.out.println("blockLast finished.");
+        Flux<String> dynamicFlux = Flux.merge(requests);
+//        dynamicFlux.subscribe(context::publishEvent, error -> System.out.println("Error: " + error));
+
+        dynamicFlux.blockLast();
+        System.out.println("blockLast finished.");
+    }
+
+    @EventListener(QueryTaskManagersSuccessEvent.class)
+    public void postTaskManager(QueryTaskManagersSuccessEvent event) {
+        log.info("evn: {}, managerId: {}", event.env, event.rspDto.getManagers().get(0).getId());
+        FlinkClusterDetail flinkClusterDetail = mapFlinkClusterDetail.get(event.env);
+        flinkClusterDetail.setTaskManagerId(event.rspDto.getManagers().get(0).getId());
+        // TODO: suyh - 处理逻辑
+    }
+
+    @EventListener(QueryTaskManagerMetricsSuccessEvent.class)
+    public void postTaskManagerMetrics(QueryTaskManagerMetricsSuccessEvent event) {
+        for (TaskManagerMetricsByIdRspDto rspDto : event.rspDtos) {
+            log.info("env: {}, id: {}, value: {}", event.env, rspDto.getId(), rspDto.getValue());
+        }
+
+
+        FlinkClusterDetail flinkClusterDetail = mapFlinkClusterDetail.get(event.env);
+        // TODO: suyh - 处理逻辑，插入数据库
+
+    }
+
+    private void postTaskManagerMetrics(FlinkClusterDetail detail, TaskManagerMetricsByIdRspDto[] rspDtos) {
+        try {
+            FlinkEnvConfigEntity flinkEnvConfigEntity = detail.getFlinkEnvConfigEntity();
+            TaskManagerMetricsEntity entity = mappingEntity(rspDtos);
+            entity.setFlinkEnvName(flinkEnvConfigEntity.getFlinkEnvName());
+            entity.setTs(System.currentTimeMillis());   // 这里使用当前系统时间，而不使用 返回的心跳时间，没搞清楚那个时间戳为什么长时间都没有发生变化。
+            taskManagerMetricsMapper.insert(entity);
+        } catch (Exception e) {
+            // 失败，则重置taskManagerId，使得重新
+            detail.setTaskManagerId(null);
+        }
     }
 
 //    private void queryTaskManagerMetricPlus(FlinkClusterDetail flinkClusterDetail) {
