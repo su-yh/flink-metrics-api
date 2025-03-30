@@ -101,7 +101,8 @@ public class MetricPullTask {
     private String queryTaskManagerId(FlinkEnvConfigEntity flinkEnvConfigEntity) {
         String taskManagerId = null;
         try {
-            String url = "http://192.168.8.143:8991/taskmanagers";
+            String url = String.format("http://%s:%d/taskmanagers",
+                    flinkEnvConfigEntity.getFlinkWebHost(), flinkEnvConfigEntity.getFlinkWebPort());
             UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
             URI uri = builder.build().toUri();
             ResponseEntity<TaskManagersInfoRspDto> rsp = restTemplate.exchange(uri, HttpMethod.GET, null, TaskManagersInfoRspDto.class);

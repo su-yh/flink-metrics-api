@@ -15,17 +15,22 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.UriBuilder;
 import org.springframework.web.util.UriComponentsBuilder;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import javax.annotation.PostConstruct;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 /**
  * 使用异步请求
@@ -34,7 +39,7 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 @Slf4j
 public class MetricPullTaskAsync {
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final WebClient webClient = WebClient.create();
     private final ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1);
     // key: env
     private final Map<String, FlinkClusterDetail> mapFlinkClusterDetail = new HashMap<>();
@@ -61,7 +66,45 @@ public class MetricPullTaskAsync {
     }
 
     public void task() {
-        mapFlinkClusterDetail.forEach((env, flinkClusterDetail) -> queryTaskManagerMetricPlus(flinkClusterDetail));
+//        mapFlinkClusterDetail.forEach((env, flinkClusterDetail) -> queryTaskManagerMetricPlus(flinkClusterDetail));
+        List<Mono<?>> requests = new ArrayList<>();
+
+        mapFlinkClusterDetail.forEach((env, detail) -> {
+            FlinkEnvConfigEntity flinkEnvConfigEntity = detail.getFlinkEnvConfigEntity();
+            String taskManagerId = detail.getTaskManagerId();
+            if (!StringUtils.hasText(taskManagerId)) {
+                // http://%s:%d/taskmanagers
+                Function<UriBuilder, URI> uriFunction = uriBuilder -> uriBuilder
+                        .scheme("http")
+                        .host(flinkEnvConfigEntity.getFlinkWebHost())
+                        .port(flinkEnvConfigEntity.getFlinkWebPort())
+                        .path("/taskmanagers")
+                        .build();
+
+                Mono<TaskManagersInfoRspDto> responseMono = webClient.get().uri(uriFunction).retrieve().bodyToMono(TaskManagersInfoRspDto.class);
+                requests.add(responseMono);
+            } else {
+                String metricsParams = String.join(",", Constants.STATUS_ID_LIST);
+                // http://%s:%d/taskmanagers/{taskManagerId}/metrics?get=xxx,xxx,xxx,xxx
+                Function<UriBuilder, URI> uriFunction = uriBuilder -> uriBuilder
+                        .scheme("http")
+                        .host(flinkEnvConfigEntity.getFlinkWebHost())
+                        .port(flinkEnvConfigEntity.getFlinkWebPort())
+                        .path("/taskmanagers/{taskManagerId}/metrics")
+                        .queryParam("get", metricsParams)
+                        .build(taskManagerId);
+
+                Mono<TaskManagerMetricsByIdRspDto[]> responseMono = webClient.get().uri(uriFunction).retrieve()
+                        .bodyToMono(TaskManagerMetricsByIdRspDto[].class);
+                requests.add(responseMono);
+            }
+        });
+
+        Flux<Object> dynamicFlux = Flux.merge(requests);
+        dynamicFlux.subscribe(res -> System.out.println("res: " + res.getClass().getSimpleName()), error -> System.out.println("Error: " + error));
+
+        dynamicFlux.blockLast();
+        System.out.println("blockLast finished.");
     }
 
     private void queryTaskManagerMetricPlus(FlinkClusterDetail flinkClusterDetail) {
@@ -105,7 +148,8 @@ public class MetricPullTaskAsync {
     private String queryTaskManagerId(FlinkEnvConfigEntity flinkEnvConfigEntity) {
         String taskManagerId = null;
         try {
-            String url = "http://192.168.8.143:8991/taskmanagers";
+            String url = String.format("http://%s:%d/taskmanagers",
+                    flinkEnvConfigEntity.getFlinkWebHost(), flinkEnvConfigEntity.getFlinkWebPort());
             UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(url);
             URI uri = builder.build().toUri();
             ResponseEntity<TaskManagersInfoRspDto> rsp = restTemplate.exchange(uri, HttpMethod.GET, null, TaskManagersInfoRspDto.class);
