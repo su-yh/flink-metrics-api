@@ -1,6 +1,7 @@
 package com.suyh.metric.task;
 
 import com.suyh.metric.constant.Constants;
+import com.suyh.metric.dto.rsp.TaskManagerInfoDetail;
 import com.suyh.metric.dto.rsp.TaskManagerMetricsByIdRspDto;
 import com.suyh.metric.dto.rsp.TaskManagersInfoRspDto;
 import com.suyh.metric.mp.FlinkClusterDetail;
@@ -76,7 +77,37 @@ public class MetricPullTaskAsync {
                         .build();
 
                 Mono<TaskManagersInfoRspDto> responseMono = webClient.get().uri(uriFunction).retrieve().bodyToMono(TaskManagersInfoRspDto.class);
-                responseMono.subscribe(res -> System.out.println("taskManagerId result: " + res.getClass().getSimpleName()));
+                //            TaskManagersInfoRspDto body = rsp.getBody();
+//            if (body == null) {
+//                return null;
+//            }
+//
+//            List<TaskManagerInfoDetail> managers = body.getManagers();
+//            if (managers == null || managers.isEmpty()) {
+//                return null;
+//            }
+//
+//            TaskManagerInfoDetail taskManagerInfoDetail = managers.get(0);
+//            if (taskManagerInfoDetail == null) {
+//                return null;
+//            }
+//
+//            taskManagerId = taskManagerInfoDetail.getId();
+                responseMono.subscribe(taskManagersInfoRspDto -> {
+                    System.out.println("taskManagerId result: " + taskManagersInfoRspDto.getClass().getSimpleName());
+                    List<TaskManagerInfoDetail> managers = taskManagersInfoRspDto.getManagers();
+                    if (managers == null || managers.isEmpty()) {
+                        return;
+                    }
+
+                    TaskManagerInfoDetail managerInfoDetail = managers.get(0);
+                    if (managerInfoDetail == null) {
+                        return;
+                    }
+
+                    detail.setTaskManagerId(managerInfoDetail.getId());
+                    System.out.println("taskManagerId: " + detail.getTaskManagerId());
+                });
                 requests.add(responseMono);
             } else {
                 String metricsParams = String.join(",", Constants.STATUS_ID_LIST);
