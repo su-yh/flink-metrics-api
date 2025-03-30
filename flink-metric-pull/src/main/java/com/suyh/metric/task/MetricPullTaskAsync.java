@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -26,10 +27,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-//@Component
+/**
+ * 使用异步请求
+ */
+@Component
 @RequiredArgsConstructor
 @Slf4j
-public class MetricPullTask {
+public class MetricPullTaskAsync {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1);
     // key: env
