@@ -73,6 +73,7 @@ public class MetricPullTaskAsync {
         mapFlinkClusterDetail.forEach((env, detail) -> {
             String taskManagerId = detail.getTaskManagerId();
             if (!StringUtils.hasText(taskManagerId)) {
+                log.info("env: {}, taskManagerId is empty. {}", env, taskManagerId);
                 Mono<String> monoResult = queryTaskManagersMono(detail);
                 requests.add(monoResult);
             } else {
