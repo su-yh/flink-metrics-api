@@ -148,7 +148,7 @@ public class MetricPullTaskAsync {
         }
 
         flinkClusterDetail.setTaskManagerId(taskManagerInfoDetail.getId());
-        log.info("task manager id: {}", taskManagerInfoDetail.getId());
+        log.info("task manager id: {}({})", taskManagerInfoDetail.getId(), event.env);
     }
 
     @EventListener(QueryTaskManagerMetricsSuccessEvent.class)
