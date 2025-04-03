@@ -11,19 +11,22 @@ import com.suyh.metric.mp.entity.mysql.FlinkEnvConfigEntity;
 import com.suyh.metric.mp.entity.mysql.TaskManagerMetricsEntity;
 import com.suyh.metric.mp.mapper.mysql.TaskManagerMetricsMapper;
 import com.suyh.metric.service.FlinkEnvConfigService;
+import io.netty.channel.ChannelOption;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.event.EventListener;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriBuilder;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.netty.http.client.HttpClient;
 
 import javax.annotation.PostConstruct;
 import java.net.URI;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,7 +43,7 @@ import java.util.function.Function;
 @RequiredArgsConstructor
 @Slf4j
 public class MetricPullTaskAsync {
-    private final WebClient webClient = WebClient.create();
+    private WebClient webClient;
     private final ScheduledExecutorService scheduledExecutorService = Executors.newScheduledThreadPool(1);
     // key: env
     private final Map<String, FlinkClusterDetail> mapFlinkClusterDetail = new HashMap<>();
@@ -52,6 +55,14 @@ public class MetricPullTaskAsync {
 
     @PostConstruct
     public void init() throws Exception {
+        // 创建一个 HttpClient 并设置连接超时和读取超时时间
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)    // 连接超时
+                .responseTimeout(Duration.ofSeconds(10)); // 读取超时
+
+        // 使用自定义的 HttpClient 创建 WebClient
+        webClient = WebClient.builder().clientConnector(new ReactorClientHttpConnector(httpClient)).build();
+
         List<FlinkEnvConfigEntity> flinkEnvConfigEntities = flinkEnvConfigService.listAll();
         if (flinkEnvConfigEntities == null || flinkEnvConfigEntities.isEmpty()) {
             log.warn("{} IS EMPTY.", FlinkEnvConfigEntity.class.getSimpleName());
@@ -82,8 +93,13 @@ public class MetricPullTaskAsync {
             }
         });
 
-        Flux<String> dynamicFlux = Flux.merge(requests);
-        dynamicFlux.blockLast(); // 阻塞等待全部请求都结束
+        for (Mono<String> request : requests) {
+            request.block(Duration.ofSeconds(5));
+            log.info("block completed.");
+        }
+        log.info("block finished. size: {}", requests.size());
+//        Flux<String> dynamicFlux = Flux.merge(requests);
+//        dynamicFlux.blockLast(Duration.ofSeconds(60)); // 阻塞等待全部请求都结束
     }
 
     private Mono<String> queryTaskManagersMono(FlinkClusterDetail detail) {
@@ -100,7 +116,11 @@ public class MetricPullTaskAsync {
 
         Mono<TaskManagersInfoRspDto> responseMono = webClient.get().uri(uriFunction).retrieve().bodyToMono(TaskManagersInfoRspDto.class);
         return responseMono.doOnSuccess(rspDto -> context.publishEvent(new QueryTaskManagersSuccessEvent(env, rspDto)))
-                .doOnError(error -> System.out.println("error: " + error))
+                .onErrorResume(error -> {
+                    System.out.println("error: " + error);
+                    log.error("error: {}", error.getMessage());
+                    return Mono.just(new TaskManagersInfoRspDto());
+                }).timeout(Duration.ofSeconds(1))
                 .map(rspDto -> "OK");
     }
 
@@ -123,7 +143,11 @@ public class MetricPullTaskAsync {
                 .bodyToMono(TaskManagerMetricsByIdRspDto[].class);
 
         return responseMono.doOnSuccess(rspDtos -> context.publishEvent(new QueryTaskManagerMetricsSuccessEvent(env, rspDtos)))
-                .doOnError(error -> detail.setTaskManagerId(null))
+                .onErrorResume(error -> {
+                    detail.setTaskManagerId(null);
+                    log.warn("env: {}, task manager metrics failed, reset taskManagerId is null. message: {}", env, error.getMessage());
+                    return Mono.just(new TaskManagerMetricsByIdRspDto[]{});
+                }).timeout(Duration.ofSeconds(1))
                 .map(rspDtos -> "OK");
     }
 
@@ -165,10 +189,11 @@ public class MetricPullTaskAsync {
             entity.setFlinkEnvName(flinkEnvConfigEntity.getFlinkEnvName());
             entity.setTs(System.currentTimeMillis());   // 这里使用当前系统时间，而不使用 返回的心跳时间，没搞清楚那个时间戳为什么长时间都没有发生变化。
             taskManagerMetricsMapper.insert(entity);
-            log.info("task manager metrics finished, env: {}", event.env);
+            log.debug("task manager metrics finished, env: {}", event.env);
         } catch (Exception e) {
             // 失败，则重置taskManagerId，使得重新
             flinkClusterDetail.setTaskManagerId(null);
+            log.warn("env: {}, reset taskManagerId is null. message: {}", event.env, e.getMessage());
         }
     }
 
